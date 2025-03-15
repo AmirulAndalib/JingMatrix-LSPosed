@@ -13,6 +13,7 @@ on:
     tags: [ v* ]
   pull_request:
   merge_group:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -101,7 +102,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew zipAll
 
-      # Only proceed with release steps if this isn't a PR
+      # Only proceed with release steps if this isn't a pull request
       - name: Prepare release artifact
         if: ${{ github.event_name != 'pull_request' }}
         id: prepare_release
@@ -156,7 +157,7 @@ EOF
           fi
           echo "Modified zip file created: $RELEASE_NAME.zip"
 
-      # Commit the update files to the repo for permanent access
+      # Commit the update files to the repository for permanent access
       - name: Commit update files
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
         run: |
@@ -180,7 +181,7 @@ EOF
 
       # Create GitHub release and upload assets
       - name: Create GitHub Release
-        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) }}
+        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && github.event.inputs.create_release }}
         uses: softprops/action-gh-release@v2
         with:
           name: "LSPosed ${{ steps.prepare_release.outputs.version }}"
