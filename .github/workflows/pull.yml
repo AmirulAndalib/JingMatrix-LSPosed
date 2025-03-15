@@ -1,0 +1,91 @@
+name: Pull Upstream Changes
+
+on:
+  workflow_dispatch: # Allow manual triggering
+  schedule:
+    # Run every 6 hours (at minute 0 of hour 0, 6, 12, and 18)
+    - cron: '0 */6 * * *'
+
+jobs:
+  sync-with-upstream:
+    runs-on: ubuntu-latest
+    name: Sync with upstream repository
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We need the full history for proper merging
+          ref: master
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+      - name: Add upstream repository
+        run: |
+          git remote add upstream https://github.com/JingMatrix/LSPosed.git
+          git remote -v
+      
+      - name: Fetch upstream changes
+        run: |
+          git fetch upstream
+          
+      - name: Check for changes
+        id: check_changes
+        run: |
+          UPSTREAM_SHA=$(git rev-parse upstream/master)
+          CURRENT_SHA=$(git rev-parse HEAD)
+          
+          if [ "$UPSTREAM_SHA" = "$CURRENT_SHA" ]; then
+            echo "No new changes detected in upstream repository."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "New changes detected in upstream repository."
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            # Show what changed
+            git log --oneline HEAD..upstream/master | head -n 10
+          fi
+      
+      - name: Merge upstream changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: merge
+        continue-on-error: true  # Allow the workflow to continue even if the merge fails
+        run: |
+          # Try to merge changes from upstream
+          if git merge upstream/master --no-edit; then
+            echo "merge_status=success" >> $GITHUB_OUTPUT
+            echo "Successfully merged changes from upstream repository."
+          else
+            echo "merge_status=failed" >> $GITHUB_OUTPUT
+            echo "Merge conflict detected. Manual intervention required."
+            # Reset to avoid issues in next steps
+            git merge --abort
+          fi
+      
+      - name: Push changes (if merge succeeded)
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.merge.outputs.merge_status == 'success'
+        run: git push origin master
+      
+      - name: Create issue for merge conflict
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.merge.outputs.merge_status == 'failed'
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_REPO: JingMatrix/LSPosed
+          DATE: ${{ github.event.repository.updated_at }}
+        with:
+          filename: .github/MERGE_CONFLICT_TEMPLATE.md
+          update_existing: true
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_changes.outputs.has_changes }}" == "false" ]; then
+            echo "✅ No new changes to sync from upstream"
+          elif [ "${{ steps.merge.outputs.merge_status }}" == "success" ]; then
+            echo "✅ Successfully pulled and merged changes from upstream"
+          else
+            echo "❌ Merge conflict detected. Please resolve manually"
+            exit 1
+          fi
