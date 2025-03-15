@@ -1,0 +1,18 @@
+# LSPosed v1.10.1-7181 Changelog
+Released on 2025-03-15
+
+* Update core.yml
+* Update core.yml
+* Update core.yml
+* Update core.yml
+* Update core.yml
+* Follow system settings of animation scales (#222)
+* Adapt to the restructure of lsplant
+* Adjust logs for dex2oat
+* Update dependencies
+* Fix liboat_hook.so inaccessible in some device (#190)
+* Update LSPLant (#188)
+* Update Issues templates
+* Update dependencies
+* Allow dex2oat to access files received from sockets (#165)
+* Update dependencies
