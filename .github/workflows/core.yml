@@ -132,15 +132,13 @@ jobs:
           echo "" >> log.txt
           git log -n 15 --pretty=format:"* %s" >> log.txt
           
-          # Create update.json file with proper URLs
-          cat > update.json <<EOF
-{
-  "version": "$VERSION",
-  "versionCode": "$VERSION_CODE",
-  "zipUrl": "https://github.com/AmirulAndalib/JingMatrix-LSPosed/releases/download/$VERSION/$RELEASE_NAME.zip",
-  "changelog": "https://raw.githubusercontent.com/AmirulAndalib/JingMatrix-LSPosed/main/log.txt"
-}
-EOF
+          # Create update.json file with proper URLs - Fixed format
+          echo "{" > update.json
+          echo "  \"version\": \"$VERSION\"," >> update.json
+          echo "  \"versionCode\": \"$VERSION_CODE\"," >> update.json
+          echo "  \"zipUrl\": \"https://github.com/AmirulAndalib/JingMatrix-LSPosed/releases/download/$VERSION/$RELEASE_NAME.zip\"," >> update.json
+          echo "  \"changelog\": \"https://raw.githubusercontent.com/AmirulAndalib/JingMatrix-LSPosed/main/log.txt\"" >> update.json
+          echo "}" >> update.json
           
           # Extract the zip, add our files, and repack
           mkdir -p extracted
