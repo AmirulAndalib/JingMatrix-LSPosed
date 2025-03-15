@@ -1,6 +1,6 @@
 {
-  "version": "v1.10.1-7181",
-  "versionCode": "1101-7181",
-  "zipUrl": "https://github.com/AmirulAndalib/JingMatrix-LSPosed/releases/download/v1.10.1-7181/LSPosed-v1.10.1-7181-zygisk-release.zip",
+  "version": "v1.10.1-7181-7183",
+  "versionCode": "1101-7181-7183",
+  "zipUrl": "https://github.com/AmirulAndalib/JingMatrix-LSPosed/releases/download/v1.10.1-7181-7183/LSPosed-v1.10.1-7181-7183-zygisk-release.zip",
   "changelog": "https://raw.githubusercontent.com/AmirulAndalib/JingMatrix-LSPosed/main/log.txt"
 }

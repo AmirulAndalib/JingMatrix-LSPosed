@@ -1,6 +1,8 @@
-# LSPosed v1.10.1-7181 Changelog
+# LSPosed v1.10.1-7181-7183 Changelog
 Released on 2025-03-15
 
+* Create pull.yml
+* Update module info for version v1.10.1-7181
 * Update core.yml
 * Update core.yml
 * Update core.yml
@@ -13,6 +15,4 @@ Released on 2025-03-15
 * Fix liboat_hook.so inaccessible in some device (#190)
 * Update LSPLant (#188)
 * Update Issues templates
-* Update dependencies
-* Allow dex2oat to access files received from sockets (#165)
 * Update dependencies
