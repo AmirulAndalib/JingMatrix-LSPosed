@@ -179,9 +179,12 @@ EOF
             echo "Changes committed and pushed to repository"
           fi
 
-      # Create GitHub release and upload assets
+      # Create GitHub release and upload assets with fixed condition
       - name: Create GitHub Release
-        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && github.event.inputs.create_release }}
+        if: |
+          github.event_name != 'pull_request' && 
+          (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && 
+          (github.event_name != 'workflow_dispatch' || github.event.inputs.create_release == 'true')
         uses: softprops/action-gh-release@v2
         with:
           name: "LSPosed ${{ steps.prepare_release.outputs.version }}"
