@@ -1,12 +1,7 @@
 name: Core
 
 on:
-  workflow_dispatch:
-    inputs:
-      post_telegram:
-        description: 'Post to Telegram'
-        required: true
-        type: boolean
+  workflow_dispatch: {}
   push:
     branches: [ master ]
     tags: [ v* ]
@@ -21,7 +16,6 @@ jobs:
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
       CCACHE_BASEDIR: "${{ github.workspace }}"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +26,7 @@ jobs:
       - name: Write key
         if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/master' ) || github.ref_type == 'tag' }}
         run: |
-          if [ ! -z "${{ secrets.KEY_STORE }}" ]; then
+          if [ -n "${{ secrets.KEY_STORE }}" ]; then
             echo androidStorePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> gradle.properties
             echo androidKeyAlias='${{ secrets.ALIAS }}' >> gradle.properties
             echo androidKeyPassword='${{ secrets.KEY_PASSWORD }}' >> gradle.properties
@@ -85,7 +79,7 @@ jobs:
 
       - name: Remove Android's cmake
         shell: bash
-        run: rm -rf $ANDROID_HOME/cmake
+        run: rm -rf "$ANDROID_HOME/cmake"
 
       - name: Build dependencies
         working-directory: libxposed
@@ -100,61 +94,98 @@ jobs:
           ./gradlew publishToMavenLocal
 
       - name: Build with Gradle
+        run: ./gradlew zipAll
+
+      # Only proceed with release steps if this isn't a PR
+      - name: Prepare release artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        id: prepare_release
         run: |
-          ./gradlew zipAll
-
-      - name: Prepare artifact
-        if: success()
-        id: prepareArtifact
-        run: |
-          zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-zygisk-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
-          zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-zygisk-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
-          unzip magisk-loader/release/LSPosed-v*-zygisk-release.zip -d LSPosed-zygisk-release
-          unzip magisk-loader/release/LSPosed-v*-zygisk-debug.zip -d LSPosed-zygisk-debug
-
-      - name: Upload zygisk release
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
-          path: "./LSPosed-zygisk-release/*"
-
-      - name: Upload zygisk debug
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepareArtifact.outputs.zygiskDebugName }}
-          path: "./LSPosed-zygisk-debug/*"
-
-      - name: Upload mappings
-        uses: actions/upload-artifact@v4
-        with:
-          name: mappings
-          path: |
-            magisk-loader/build/outputs/mapping
-            app/build/outputs/mapping
-
-      - name: Upload symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: symbols
-          path: build/symbols
-
-      - name: Post to channel
-        if: ${{ success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && github.ref_type != 'tag' && inputs.post_telegram != 'false' }}
-        env:
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-          DISCUSSION_ID: ${{ secrets.DISCUSSION_ID }}
-          TOPIC_ID: ${{ secrets.TOPIC_ID }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          COMMIT_URL: ${{ github.event.head_commit.url }}
-        run: |
-          if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
-            OUTPUT="magisk-loader/release/"
-            export riruRelease=$(find $OUTPUT -name "LSPosed-v*-riru-release.zip")
-            export riruDebug=$(find $OUTPUT -name "LSPosed-v*-riru-debug.zip")
-            export zygiskRelease=$(find $OUTPUT -name "LSPosed-v*-zygisk-release.zip")
-            export zygiskDebug=$(find $OUTPUT -name "LSPosed-v*-zygisk-debug.zip")
-            ESCAPED=`python3 -c 'import json,os,urllib.parse; msg = json.dumps(os.environ["COMMIT_MESSAGE"]); print(urllib.parse.quote(msg if len(msg) <= 1024 else json.dumps(os.environ["COMMIT_URL"])))'`
-            curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FriruRelease%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FzygiskRelease%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FriruDebug%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FzygiskDebug%22%2C%22caption%22:${ESCAPED}%7D%5D" -F riruRelease="@$riruRelease" -F riruDebug="@$riruDebug" -F zygiskRelease="@$zygiskRelease" -F zygiskDebug="@$zygiskDebug"
-            # curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${DISCUSSION_ID}&message_thread_id=${TOPIC_ID}&media=%5B%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FriruRelease%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FzygiskRelease%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FriruDebug%22%7D%2C%7B%22type%22%3A%22document%22%2C%20%22media%22%3A%22attach%3A%2F%2FzygiskDebug%22%2C%22caption%22:${ESCAPED}%7D%5D" -F riruRelease="@$riruRelease" -F riruDebug="@$riruDebug" -F zygiskRelease="@$zygiskRelease" -F zygiskDebug="@$zygiskDebug"
+          # Locate and analyze the zygisk release zip
+          RELEASE_ZIP=$(ls magisk-loader/release/LSPosed-v*-zygisk-release.zip | head -n 1)
+          if [ -z "$RELEASE_ZIP" ]; then
+            echo "Error: No zygisk release zip found!"
+            exit 1
           fi
+          
+          # Extract useful information
+          RELEASE_NAME=$(basename "$RELEASE_ZIP" .zip)
+          VERSION=$(echo "$RELEASE_NAME" | sed -E 's/^LSPosed-(v.*)-zygisk-release$/\1/')
+          VERSION_CODE=$(echo "$VERSION" | sed 's/^v//' | tr -d '.')
+          
+          echo "release_zip=$RELEASE_ZIP" >> $GITHUB_OUTPUT
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          
+          echo "Found: $RELEASE_NAME with version $VERSION (code: $VERSION_CODE)"
+          
+          # Create log.txt (changelog) from git history
+          echo "# LSPosed $VERSION Changelog" > log.txt
+          echo "Released on $(date +'%Y-%m-%d')" >> log.txt
+          echo "" >> log.txt
+          git log -n 15 --pretty=format:"* %s" >> log.txt
+          
+          # Create update.json file with proper URLs
+          cat > update.json <<EOF
+{
+  "version": "$VERSION",
+  "versionCode": "$VERSION_CODE",
+  "zipUrl": "https://github.com/AmirulAndalib/JingMatrix-LSPosed/releases/download/$VERSION/$RELEASE_NAME.zip",
+  "changelog": "https://raw.githubusercontent.com/AmirulAndalib/JingMatrix-LSPosed/main/log.txt"
+}
+EOF
+          
+          # Extract the zip, add our files, and repack
+          mkdir -p extracted
+          unzip -q "$RELEASE_ZIP" -d extracted
+          cp update.json extracted/
+          cp log.txt extracted/
+          
+          (cd extracted && zip -qr "../$RELEASE_NAME.zip" .)
+          
+          # Verify the modified zip exists
+          if [ ! -f "$RELEASE_NAME.zip" ]; then
+            echo "Error: Failed to create modified release zip"
+            exit 1
+          fi
+          echo "Modified zip file created: $RELEASE_NAME.zip"
+
+      # Commit the update files to the repo for permanent access
+      - name: Commit update files
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+        run: |
+          # Copy update.json to the magisk module directory first
+          mkdir -p magisk-loader/magisk_module/
+          cp update.json magisk-loader/magisk_module/
+          
+          # Configure git
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          # Commit and push the files
+          git add magisk-loader/magisk_module/update.json log.txt
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update module info for version ${{ steps.prepare_release.outputs.version }}"
+            git push
+            echo "Changes committed and pushed to repository"
+          fi
+
+      # Create GitHub release and upload assets
+      - name: Create GitHub Release
+        if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "LSPosed ${{ steps.prepare_release.outputs.version }}"
+          tag_name: ${{ steps.prepare_release.outputs.version }}
+          body_path: log.txt
+          files: |
+            ${{ steps.prepare_release.outputs.release_name }}.zip
+            update.json
+            log.txt
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          generate_release_notes: false
